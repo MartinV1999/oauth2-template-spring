@@ -1,17 +1,8 @@
 package com.martin.springboot.security.authserver.auth.server.auth;
 
-import com.martin.springboot.security.authserver.auth.server.auth.filters.JwtAuthenticationFilter;
-import com.martin.springboot.security.authserver.auth.server.auth.filters.JwtValidationFilter;
-import com.martin.springboot.security.authserver.auth.server.exception.ObjectNotFoundException;
-import com.martin.springboot.security.authserver.auth.server.repository.UserRepository;
-import com.martin.springboot.security.authserver.auth.server.services.JpaUserDetailsService;
-import com.martin.springboot.security.authserver.auth.server.services.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.AuthenticationProvider;
-import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 
@@ -19,7 +10,9 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
@@ -32,9 +25,8 @@ import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
@@ -48,21 +40,18 @@ import org.springframework.security.oauth2.server.authorization.config.annotatio
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
-import static com.martin.springboot.security.authserver.auth.server.auth.TokenConfig.*;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
     @Autowired
-    private UserService userService;
-
-    @Autowired
-    private UserRepository userRepository;
+    private AuthenticationConfiguration authenticationConfiguration;
 
     @Bean
     PasswordEncoder passwordEncoder(){
@@ -70,11 +59,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public UserDetailsService userDetailsService(){
-        return (username) -> {
-            return userService.getUserByEmail(username)
-                .orElseThrow(() -> new ObjectNotFoundException("User not found with username " + username));
-        };
+    AuthenticationManager authenticationManager() throws Exception{
+        return authenticationConfiguration.getAuthenticationManager();
     }
 
     @Bean
@@ -117,6 +103,8 @@ public class SecurityConfig {
         return http.build();
     }
 
+//Forma manual de iniciar sesión con un usuario(noop es para que la contraseña sea literal no encriptada).
+
 //    @Bean
 //    public UserDetailsService userDetailsService() {
 //        UserDetails userDetails = User.builder()
@@ -150,25 +138,25 @@ public class SecurityConfig {
         return new InMemoryRegisteredClientRepository(oidcClient);
     }
 
-//    @Bean
-//    OAuth2TokenCustomizer<JwtEncodingContext> tokenCustomizer() {
-//        return context -> {
-//            Authentication principal = context.getPrincipal();
-//            Set<String> authorities = principal.getAuthorities().stream()
-//                    .map(GrantedAuthority::getAuthority).collect(Collectors.toSet());
-//
+    @Bean
+    OAuth2TokenCustomizer<JwtEncodingContext> tokenCustomizer() {
+        return context -> {
+            Authentication principal = context.getPrincipal();
+            Set<String> authorities = principal.getAuthorities().stream()
+                    .map(GrantedAuthority::getAuthority).collect(Collectors.toSet());
+
 //            if (context.getTokenType().getValue().equals("id_token")) {
 //                context.getClaims().claim("Test", "Test Id Token")
 //                        .claim("authorities", authorities)
-//                        .claim("user", principal.getName());
+//                        .claim("user", principal.getPrincipal());
 //            }
-//            if (context.getTokenType().getValue().equals("access_token")) {
-//                context.getClaims().claim("Test", "Test Access Token");
-//                context.getClaims().claim("authorities", authorities);
-//            }
-//
-//        };
-//    }
+            if (context.getTokenType().getValue().equals("access_token")) {
+                context.getClaims().claim("User", principal.getPrincipal());
+                context.getClaims().claim("authorities", authorities);
+            }
+
+        };
+    }
 
     @Bean
     public JWKSource<SecurityContext> jwkSource() {
