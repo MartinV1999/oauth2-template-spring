@@ -1,6 +1,6 @@
 # Spring OAuth2 Authentication Server
 
-Template que proporciona la autenticación del usuario, se crea el usuario admin@correo.cl y su contraseña admin automaticamente junto a su rol (se puede cambiar en la BD), en este proyecto se usó el gestor de base de datos PostgreSQL para obtener al usuario.
+Template que proporciona la autenticación del usuario, se crea el usuario de prueba automaticamente junto a su rol (se puede cambiar en la BD), en este proyecto se usó el gestor de base de datos PostgreSQL para obtener al usuario. En ocasiones no se relaciona el rol del usuario , basta con insertarlo manualmente en la base de datos. (INSERT INTO users_roles (user_id, role_id) VALUES (1 , 1))
 
 ### Las credenciales del resource-server: 
 - username: client-app
